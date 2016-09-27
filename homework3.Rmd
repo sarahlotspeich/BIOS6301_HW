@@ -1,0 +1,203 @@
+---
+title: "Intro to Stat Computing HW 3"
+author: "Sarah Lotspeich"
+date: "9/26/2016"
+output: pdf_document
+---
+##Question 1
+
+10 points
+
+Use GitHub to turn in the first three homework assignments. Make sure the teacher (couthcommander) and TA (trippcm) are collaborators. (5 points)
+
+Commit each assignment individually. This means your repository should have at least three commits. (5 points)
+
+##Question 2
+
+15 points
+
+Write a simulation to calculate the power for the following study design. 
+
+The study has two variables, treatment group and outcome. 
+
+```{r}
+treatment <- NULL
+outcome <- NULL
+n <- 100 #sample size
+```
+
+There are two treatment groups (0, 1) and they should be assigned randomly with equal probability.
+
+```{r}
+treatment <- sample(c(0,1),n,replace=TRUE)
+```
+
+The outcome should be a random normal variable with a mean of 60 and standard deviation of 20. 
+
+```{r}
+outcome <- rnorm(n, 60,20)
+studyDesign <- data.frame(cbind(treatment,outcome))
+```
+
+If a patient is in the treatment group, add 5 to the outcome. 5 is the true treatment effect. 
+
+```{r}
+for (i in 1:length(studyDesign))
+{
+  if (studyDesign[i,1] == 1)
+  {
+    studyDesign[i,2] <- studyDesign[i,2] + 5
+  }
+}
+```
+
+Create a linear of model for the outcome by the treatment group, and extract the p-value (hint: see assigment1). 
+
+```{r}
+mod1 <- lm(outcome~treatment, data=studyDesign)
+pVal <- coef(summary(mod1))[2,4] #extract the p-value for treatment from the model
+```
+
+Test if the p-value is less than or equal to the alpha level, which should be set to 0.05.
+
+```{r}
+pVal <= 0.05
+```
+
+Repeat this procedure 1000 times. The power is calculated by finding the percentage of times the p-value is less than or equal to the alpha level. Use the set.seed command so that the professor can reproduce your results.
+
+Find the power when the sample size is 100 patients. (10 points)
+
+```{r}
+set.seed(1000)
+n <- 100 #sample size
+
+runExperiment <- function(n)
+{
+  treatment <- rbinom(n,1,0.5)
+  outcome <- rnorm(n, 60,20)
+  studyDesign <- data.frame(cbind(treatment,outcome))
+  for (i in 1:length(studyDesign))
+  {
+    if (studyDesign[i,1] == 1)
+    {
+     studyDesign[i,2] <- studyDesign[i,2] + 5
+    }
+  } 
+  mod1 <- lm(outcome~treatment, data=studyDesign)
+  pVal <- coef(summary(mod1))[2,4] #extract the p-value for treatment from the model
+  return(pVal <= 0.05) #return boolean TRUE if p-val <= 0.05, FALSE otherwise
+}
+
+N <- 1000 #run experiment N times
+pValues <- NULL
+for (i in 1:N)
+{
+  pValues[i] <- runExperiment(100)
+}
+
+power <- mean(pValues)
+```
+
+Find the power when the sample size is 1000 patients. (5 points)
+
+```{r}
+set.seed(1000)
+n <- 1000 #sample size
+
+runExperiment <- function()
+{
+  treatment <- sample(c(0,1),n,replace=TRUE)
+  outcome <- rnorm(n, 60,20)
+  studyDesign <- data.frame(cbind(treatment,outcome))
+  for (i in 1:length(studyDesign))
+  {
+    if (studyDesign[i,1] == 1)
+    {
+     studyDesign[i,2] <- studyDesign[i,2] + 5
+    }
+  } 
+  mod1 <- lm(outcome~treatment, data=studyDesign)
+  pVal <- coef(summary(mod1))[2,4] #extract the p-value for treatment from the model
+  return(pVal)
+}
+
+N <- 1000 #run experiment N times
+pValues <- NULL
+for (i in 1:N)
+{
+  pValues[i] <- runExperiment()
+}
+
+(power <- length(pValues[which(pValues <= 0.05)])/length(pValues))
+```
+
+##Question 3
+
+15 points
+
+Obtain a copy of the football-values lecture. Save the 2015/proj_rb15.csv file in your working directory. Read in the data set and remove the first two columns.
+
+```{r}
+proj_rb15 <- read.csv("https://raw.githubusercontent.com/couthcommander/football-values/master/2015/proj_rb15.csv", head=TRUE)
+proj_rb15$PlayerName <- NULL #remove first column
+proj_rb15$Team <- NULL #remove second column
+```
+
+Show the correlation matrix of this data set. (3 points)
+
+```{r}
+cor(proj_rb15)
+```
+
+Generate a data set with 30 rows that has a similar correlation structure. Repeat the procedure 10,000 times and return the mean correlation matrix. (10 points)
+
+```{r}
+library(MASS)
+#start with summary statistics
+(rho.fb <- cor(proj_rb15)) #highly correlated dataset
+(vcov.fb <- var(proj_rb15)) 
+(means.fb <- colMeans(proj_rb15))
+
+fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb)#multivariate normal, returns matrix
+fb.sim <- as.data.frame(fb.sim) #simulate new dataset of the same size from distribution of old
+(rho.fb.sim <- cor(fb.sim))
+```
+
+Generate a data set with 30 rows that has the exact correlation structure as the original data set. (2 points)
+
+```{r}
+fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb) #multivariate normal, returns matrix
+fb.sim <- as.data.frame(fb.sim) #simulate new dataset of the same size from distribution of old
+(rho.fb.sim <- cor(fb.sim))
+```
+
+##Question 4
+
+10 points
+
+Use \LaTeX to create the following expressions.
+
+1. 
+
+\begin{center}
+$\begin{aligned}
+P(B) &  = \underset{j}{\Sigma}P(B|A_i)P(A_i), \\
+& \rightarrow P(A_i|B) = \frac{P(B|A_i)P(A_i)}{\Sigma_{j}P(B|A_j)P(A_j)}
+\end{aligned}$
+\end{center}
+
+2. 
+
+\begin{center}
+$\hat{f}(\zeta) = \int_{-\infty}^{\infty}f(x)e^{-2 \pi i x \zeta}dx$
+\end{center}
+
+3. 
+
+$\textbf{J} = \frac{d\textbf{f}}{d\textbf{x}} = [\frac{\partial\textbf{f}}{\partial x_1} \dots \frac{\partial\textbf{f}}{\partial x_n}] = 
+\begin{bmatrix} 
+\frac{\partial\textbf{f}_1}{\partial x_1} & \dots & \frac{\partial\textbf{f}_1}{\partial x_n} \\ 
+\vdots & \ddots & \vdots \\
+\frac{\partial\textbf{f}_m}{\partial x_1} & \dots & \frac{\partial\textbf{f}_m}{\partial x_n} \end{bmatrix}$
+

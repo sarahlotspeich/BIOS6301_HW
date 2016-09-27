@@ -1,0 +1,118 @@
+---
+title: "Intro to Stat Computing HW 1"
+author: "Sarah Lotspeich"
+date: "September 1, 2016"
+output: pdf_document
+---
+\textbf{Create a Data Set}
+
+```{r}
+gender <- c('M','M','F','M','F','F','M','F','M')
+age <- c(34, 64, 38, 63, 40, 73, 27, 51, 47)
+smoker <- c('no','yes','no','no','yes','no','no','no','yes')
+exercise <- factor(c('moderate','frequent','some','some','moderate','none','none','moderate','moderate'),
+                    levels=c('none','some','moderate','frequent'), ordered=TRUE)
+los <- c(4,8,1,10,6,3,9,4,8)
+x <- data.frame(gender, age, smoker, exercise, los)
+x
+```
+
+\textbf{Create a Model}
+
+```{r}
+lm(los ~ gender + age + smoker + exercise, dat=x)
+```
+
+1. Looking at this output, genderM seems to have the undisputed largest effect on los. However, this output displays only coefficients without their respective standard errors, t test statistics, and P values.The implication of this output is that males spend 4.509 days longer. 
+
+2. Chiseling down from all of the original variables, I focused on a simple model relating variable los(y) to gender(x). Naming this new model mod, I then used the summary() function to explore not only coefficient estimates for hte model but also the standard errors, t test statistics, and P values.
+
+```{r}
+mod <- lm(los~gender, dat=x)
+summary(mod)
+```
+
+If we're interested in pulling just the coefficients out of this new model, we can do so via the coef() function.
+
+```{r}
+coef(summary(mod))
+```
+
+3. From this additional output, it is straightforward that the estimate for the y-intercept of mod is 3.5 and for the effect of gender is 4.3.
+
+$\hat{length of stay} = 3.5 + 4.3(genderM = 1 for male, = 1 for female)$
+
+4. While the coef() function displays the standard errors, we can calculate these by hand as follows:
+
+```{r}
+sqrt(diag(vcov(summary(mod))))
+```
+
+From here, we can calculate the t test statistics on our own by dividing the coefficient estimates by their respective standard errors.
+
+```{r}
+(mod.c <- coef(summary(mod))) #save the coefficients
+(testStats <- mod.c[,1]/mod.c[,2]) #calculate test statistics = est / std error
+```
+
+5. Then carry out the t test for gender to find the P value and draw conclusions about significance.
+
+```{r}
+(genderP <- pt(q = testStats[2],df = 7, lower.tail = FALSE)) #calculated p value
+2*genderP #calculate two-tailed p value
+```
+
+6. Practice predicting values from mod using predict() and fitted() functions.
+
+```{r}
+predict(mod)
+fitted(mod)
+```
+
+7. Try using mod to make predictions based on a new data set.
+
+```{r}
+(newdat <- data.frame(gender=c("F","M","F")))
+predict(object = mod, newdata = newdat)
+```
+
+8. Then I added the predicted values to the original dataframe, along with their respective residuals (calculated both by hand and by way of the residuals() function), for easy comparison.
+
+```{r}
+x$predicted <- predict(mod)
+x$residCalc <- x$los - x$predicted
+x$residFunc <- residuals(mod)
+x
+```
+
+9. Additionally, I created a sqResid column equal to the residuals^2, which could then be easily summed to calculate the SSR. After executing the deviance() function on mod, I was relieved to find that my homemade calculation for the sum of the squared residuals was equal.
+
+```{r}
+x$sqResid <- x$residFunc^2
+x
+(SSR <- sum(x$sqResid))
+deviance(mod)
+```
+
+10. Using the df.residual() function in conjunction with the deviance() function, I calculated the residual standard error manually and then compared it to the residual standard error in the model summary. Success! 
+```{r}
+df.residual(mod)
+(calcStdErr <- sqrt(deviance(mod)/df.residual(mod)))
+summary(mod)
+predict(mod, se.fit=TRUE)$residual.scale
+```
+ 
+11. Finally, I conducted a two-sample t-test comparing the length of stay (los) sample means between men and women. Since the two-sample t-test assumes the two samples are of unequal variance, I began by comparing the variance of the los variable in the men and women groups. Inspired by this variance output, I ran the t.test() with and without the assumption that the variances are equal. The p-value from the t.test with equal variance matched the p-value for the genderM variable in the model summary.
+
+```{r}
+men <- subset(x, gender=="M")
+women <- subset(x, gender=="F")
+var(men$los)
+var(women$los)
+t.test(women$los, men$los)
+t.test(women$los, men$los, var.equal=TRUE)
+t.test(los~gender, dat=x, var.equal=TRUE)
+#alternative way
+t.test(los~gender, dat=x, var.equal=TRUE)$p.value
+coef(summary(lm(los~gender, dat=x)))[2,4]
+```
