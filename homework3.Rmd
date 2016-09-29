@@ -1,20 +1,16 @@
 ---
 title: "Intro to Stat Computing HW 3"
 author: "Sarah Lotspeich"
-date: "9/26/2016"
+date: "11 October 2016"
 output: pdf_document
 ---
 ##Question 1
-
-10 points
 
 Use GitHub to turn in the first three homework assignments. Make sure the teacher (couthcommander) and TA (trippcm) are collaborators. (5 points)
 
 Commit each assignment individually. This means your repository should have at least three commits. (5 points)
 
 ##Question 2
-
-15 points
 
 Write a simulation to calculate the power for the following study design. 
 
@@ -29,7 +25,7 @@ n <- 100 #sample size
 There are two treatment groups (0, 1) and they should be assigned randomly with equal probability.
 
 ```{r}
-treatment <- sample(c(0,1),n,replace=TRUE)
+treatment <- rbinom(n,1,0.5)
 ```
 
 The outcome should be a random normal variable with a mean of 60 and standard deviation of 20. 
@@ -42,13 +38,7 @@ studyDesign <- data.frame(cbind(treatment,outcome))
 If a patient is in the treatment group, add 5 to the outcome. 5 is the true treatment effect. 
 
 ```{r}
-for (i in 1:length(studyDesign))
-{
-  if (studyDesign[i,1] == 1)
-  {
-    studyDesign[i,2] <- studyDesign[i,2] + 5
-  }
-}
+studyDesign[studyDesign[,1]==1,2] <- studyDesign[studyDesign[,1]==1,2]+5
 ```
 
 Create a linear of model for the outcome by the treatment group, and extract the p-value (hint: see assigment1). 
@@ -70,30 +60,23 @@ Find the power when the sample size is 100 patients. (10 points)
 
 ```{r}
 set.seed(1000)
-n <- 100 #sample size
-
 runExperiment <- function(n)
 {
-  treatment <- rbinom(n,1,0.5)
+  treatment <- sample(x = seq(0,1),size = n, replace=TRUE)
   outcome <- rnorm(n, 60,20)
   studyDesign <- data.frame(cbind(treatment,outcome))
-  for (i in 1:length(studyDesign))
-  {
-    if (studyDesign[i,1] == 1)
-    {
-     studyDesign[i,2] <- studyDesign[i,2] + 5
-    }
-  } 
+  studyDesign[studyDesign[,1]==1,2] <- studyDesign[studyDesign[,1]==1,2]+5
   mod1 <- lm(outcome~treatment, data=studyDesign)
   pVal <- coef(summary(mod1))[2,4] #extract the p-value for treatment from the model
-  return(pVal <= 0.05) #return boolean TRUE if p-val <= 0.05, FALSE otherwise
+  return(pVal < 0.05) #return boolean TRUE if p-val <= 0.05, FALSE otherwise
 }
 
+n <- 100 #sample size
 N <- 1000 #run experiment N times
 pValues <- NULL
 for (i in 1:N)
 {
-  pValues[i] <- runExperiment(100)
+  pValues[i] <- runExperiment(n)
 }
 
 power <- mean(pValues)
@@ -104,41 +87,21 @@ Find the power when the sample size is 1000 patients. (5 points)
 ```{r}
 set.seed(1000)
 n <- 1000 #sample size
-
-runExperiment <- function()
-{
-  treatment <- sample(c(0,1),n,replace=TRUE)
-  outcome <- rnorm(n, 60,20)
-  studyDesign <- data.frame(cbind(treatment,outcome))
-  for (i in 1:length(studyDesign))
-  {
-    if (studyDesign[i,1] == 1)
-    {
-     studyDesign[i,2] <- studyDesign[i,2] + 5
-    }
-  } 
-  mod1 <- lm(outcome~treatment, data=studyDesign)
-  pVal <- coef(summary(mod1))[2,4] #extract the p-value for treatment from the model
-  return(pVal)
-}
-
 N <- 1000 #run experiment N times
 pValues <- NULL
 for (i in 1:N)
 {
-  pValues[i] <- runExperiment()
+  pValues[i] <- runExperiment(n)
 }
 
-(power <- length(pValues[which(pValues <= 0.05)])/length(pValues))
+power <- mean(pValues)
 ```
 
 ##Question 3
 
-15 points
-
 Obtain a copy of the football-values lecture. Save the 2015/proj_rb15.csv file in your working directory. Read in the data set and remove the first two columns.
 
-```{r}
+```{r, tidy=TRUE}
 proj_rb15 <- read.csv("https://raw.githubusercontent.com/couthcommander/football-values/master/2015/proj_rb15.csv", head=TRUE)
 proj_rb15$PlayerName <- NULL #remove first column
 proj_rb15$Team <- NULL #remove second column
@@ -155,49 +118,53 @@ Generate a data set with 30 rows that has a similar correlation structure. Repea
 ```{r}
 library(MASS)
 #start with summary statistics
-(rho.fb <- cor(proj_rb15)) #highly correlated dataset
-(vcov.fb <- var(proj_rb15)) 
-(means.fb <- colMeans(proj_rb15))
+rho.fb <- cor(proj_rb15)
+vcov.fb <- var(proj_rb15)
+means.fb <- colMeans(proj_rb15)
 
-fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb)#multivariate normal, returns matrix
-fb.sim <- as.data.frame(fb.sim) #simulate new dataset of the same size from distribution of old
-(rho.fb.sim <- cor(fb.sim))
+#generate a data set with 30 rows with similar correlation structure
+fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb)
+
+#repeat the procedure 10,000 times and return mean correlation matrix
+avgCor <- 0
+loops <- 10000
+for (i in seq(loops))
+{
+  fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb)
+  avgCor <- avgCor + cor(fb.sim)/loops  
+}
+avgCor
+rho.fb
 ```
 
 Generate a data set with 30 rows that has the exact correlation structure as the original data set. (2 points)
 
 ```{r}
-fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb) #multivariate normal, returns matrix
-fb.sim <- as.data.frame(fb.sim) #simulate new dataset of the same size from distribution of old
-(rho.fb.sim <- cor(fb.sim))
+fb.sim <- mvrnorm(30, mu = means.fb, Sigma = vcov.fb, empirical=TRUE) 
+cor(fb.sim)
+rho.fb
 ```
 
 ##Question 4
-
-10 points
 
 Use \LaTeX to create the following expressions.
 
 1. 
 
-\begin{center}
-$\begin{aligned}
+$$\begin{aligned}
 P(B) &  = \underset{j}{\Sigma}P(B|A_i)P(A_i), \\
 & \rightarrow P(A_i|B) = \frac{P(B|A_i)P(A_i)}{\Sigma_{j}P(B|A_j)P(A_j)}
-\end{aligned}$
-\end{center}
+\end{aligned}$$
 
 2. 
 
-\begin{center}
-$\hat{f}(\zeta) = \int_{-\infty}^{\infty}f(x)e^{-2 \pi i x \zeta}dx$
-\end{center}
+$$\hat{f}(\zeta) = \int_{-\infty}^{\infty}f(x)e^{-2 \pi i x \zeta}dx$$
 
 3. 
 
-$\textbf{J} = \frac{d\textbf{f}}{d\textbf{x}} = [\frac{\partial\textbf{f}}{\partial x_1} \dots \frac{\partial\textbf{f}}{\partial x_n}] = 
+$$\textbf{J} = \frac{d\textbf{f}}{d\textbf{x}} = [\frac{\partial\textbf{f}}{\partial x_1} \dots \frac{\partial\textbf{f}}{\partial x_n}] = 
 \begin{bmatrix} 
 \frac{\partial\textbf{f}_1}{\partial x_1} & \dots & \frac{\partial\textbf{f}_1}{\partial x_n} \\ 
 \vdots & \ddots & \vdots \\
-\frac{\partial\textbf{f}_m}{\partial x_1} & \dots & \frac{\partial\textbf{f}_m}{\partial x_n} \end{bmatrix}$
+\frac{\partial\textbf{f}_m}{\partial x_1} & \dots & \frac{\partial\textbf{f}_m}{\partial x_n} \end{bmatrix}$$
 
