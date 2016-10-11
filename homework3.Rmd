@@ -25,7 +25,7 @@ n <- 100 #sample size
 There are two treatment groups (0, 1) and they should be assigned randomly with equal probability.
 
 ```{r}
-treatment <- rbinom(n,1,0.5)
+treatment <- sample(x = seq(0,1),size = n, replace=TRUE)
 ```
 
 The outcome should be a random normal variable with a mean of 60 and standard deviation of 20. 
