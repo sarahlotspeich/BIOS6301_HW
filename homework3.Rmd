@@ -1,5 +1,5 @@
 ---
-title: "Intro to Stat Computing HW 3"
+title: "Intro to Statistical Computing HW 3"
 author: "Sarah Lotspeich"
 date: "11 October 2016"
 output: pdf_document

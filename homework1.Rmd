@@ -1,12 +1,14 @@
 ---
-title: "Intro to Stat Computing HW 1"
+title: "Intro to Statistical Computing HW 1"
 author: "Sarah Lotspeich"
-date: "September 1, 2016"
+date: "1 September 2016"
 output: pdf_document
 ---
-\textbf{Create a Data Set}
+##Create a Data Set##
 
-```{r}
+A data set in R is called a data.frame. This particular data set is made of three categorical variables, or factors: gender, smoker, and exercise. In addition exercise is an ordered factor. age and los (length of stay) are continuous variables.
+
+```{r, tidy=TRUE}
 gender <- c('M','M','F','M','F','F','M','F','M')
 age <- c(34, 64, 38, 63, 40, 73, 27, 51, 47)
 smoker <- c('no','yes','no','no','yes','no','no','no','yes')
@@ -17,66 +19,100 @@ x <- data.frame(gender, age, smoker, exercise, los)
 x
 ```
 
-\textbf{Create a Model}
+##Create a Model##
+
+We can create a model using our data set. In this case I’d like to estimate the association between los and all remaining variables. This means los is our dependent variable. The other columns will be terms in our model.
+
+The lm function will take two arguments, a formula and a data set. The formula is split into two parts, where the vector to the left of ~ is the dependent variable, and items on the right are terms.
 
 ```{r}
 lm(los ~ gender + age + smoker + exercise, dat=x)
 ```
 
-1. Looking at this output, genderM seems to have the undisputed largest effect on los. However, this output displays only coefficients without their respective standard errors, t test statistics, and P values.The implication of this output is that males spend 4.509 days longer. 
+1. Looking at the output, which coefficient seems to have the highest effect on los? (2 points)
 
-2. Chiseling down from all of the original variables, I focused on a simple model relating variable los(y) to gender(x). Naming this new model mod, I then used the summary() function to explore not only coefficient estimates for hte model but also the standard errors, t test statistics, and P values.
+Looking at this output, genderM seems to have the undisputed largest effect on los. However, this output displays only coefficients without their respective standard errors, t test statistics, and P values.The implication of this output is that males spend 4.509 days longer. 
+
+This can be tough because it also depends on the scale of the variable. If all the variables are standardized, then this is not the case.
+
+Given that we only have nine observations, it's not really a good idea to include all of our variables in the model. In this case we'd be "over-fitting" our data. Let's only include one term, gender.
+
+Warning
+
+When choosing terms for a model, use prior research, don't just select the variable with the highest coefficient.
+
+2. Create a model using los and gender and assign it to the variable mod. Run the summary function with mod as its argument. (5 points)
+
+Chiseling down from all of the original variables, I focused on a simple model relating variable los(y) to gender(x). Naming this new model mod, I then used the summary() function to explore not only coefficient estimates for the model but also the standard errors, t test statistics, and P values.
 
 ```{r}
 mod <- lm(los~gender, dat=x)
 summary(mod)
 ```
 
-If we're interested in pulling just the coefficients out of this new model, we can do so via the coef() function.
+The summary of our model reports the parameter estimates along with standard errors, test statistics, and p-values. This table of estimates can be extracted with the coef function.
+
+##Estimates##
+
+3. What is the estimate for the intercept? What is the estimate for gender? Use the coef function. (3 points)
 
 ```{r}
 coef(summary(mod))
 ```
 
-3. From this additional output, it is straightforward that the estimate for the y-intercept of mod is 3.5 and for the effect of gender is 4.3.
+From this additional output, it is straightforward that the estimate for the y-intercept of mod is 3.5 and for the effect of gender is 4.3.
 
-$\hat{length of stay} = 3.5 + 4.3(genderM = 1 for male, = 1 for female)$
+$\hat{\text{length of stay}} = 3.5 + 4.3(genderM = 1\text{ for male}, = 1\text{ for female})$
 
-4. While the coef() function displays the standard errors, we can calculate these by hand as follows:
+4. The second column of coef are standard errors. These can be calculated by taking the sqrt of the diag of the vcov of the summary of mod. Calculate the standard errors. (3 points) 
 
 ```{r}
 sqrt(diag(vcov(summary(mod))))
 ```
 
-From here, we can calculate the t test statistics on our own by dividing the coefficient estimates by their respective standard errors.
+The third column of coef are test statistics. These can be calculated by dividing the first column by the second column.
+
+The fourth column of coef are p values. This captures the probability of observing a more extreme test statistic. These can be calculated with the pt function, but you will need the degrees-of-freedom. For this model, there are 7 degrees-of-freedom.
+
+5. Use the pt function to calculate the p value for gender. The first argument should be the test statistic for gender. The second argument is the degrees-of-freedom. Also, set the lower.tail argument to FALSE. Finally multiple this result by two. (4 points)
 
 ```{r}
 (mod.c <- coef(summary(mod))) #save the coefficients
 (testStats <- mod.c[,1]/mod.c[,2]) #calculate test statistics = est / std error
 ```
 
-5. Then carry out the t test for gender to find the P value and draw conclusions about significance.
+Then carry out the t test for gender to find the P value and draw conclusions about significance.
 
 ```{r}
 (genderP <- pt(q = testStats[2],df = 7, lower.tail = FALSE)) #calculated p value
 2*genderP #calculate two-tailed p value
 ```
 
-6. Practice predicting values from mod using predict() and fitted() functions.
+##Predicted Values##
+
+The estimates can be used to create predicted values.
+
+6. It is even easier to see the predicted values by passing the model mod to the predict or fitted functions. Try it out. (2 points)
 
 ```{r}
 predict(mod)
 fitted(mod)
 ```
 
-7. Try using mod to make predictions based on a new data set.
+7. predict can also use a new data set. Pass newdat as the second argument to predict. (3 points)
 
 ```{r}
 (newdat <- data.frame(gender=c("F","M","F")))
 predict(object = mod, newdata = newdat)
 ```
 
-8. Then I added the predicted values to the original dataframe, along with their respective residuals (calculated both by hand and by way of the residuals() function), for easy comparison.
+##Residuals##
+
+The difference between predicted values and observed values are residuals.
+
+8. Use one of the methods to generate predicted values. Subtract the predicted value from the x$los column. (5 points)
+
+9. Try passing mod to the residuals function. (2 points)
 
 ```{r}
 x$predicted <- predict(mod)
@@ -85,7 +121,7 @@ x$residFunc <- residuals(mod)
 x
 ```
 
-9. Additionally, I created a sqResid column equal to the residuals^2, which could then be easily summed to calculate the SSR. After executing the deviance() function on mod, I was relieved to find that my homemade calculation for the sum of the squared residuals was equal.
+10. Square the residuals, and then sum these values. Compare this to the result of passing mod to the deviance function. (6 points)
 
 ```{r}
 x$sqResid <- x$residFunc^2
@@ -94,7 +130,12 @@ x
 deviance(mod)
 ```
 
-10. Using the df.residual() function in conjunction with the deviance() function, I calculated the residual standard error manually and then compared it to the residual standard error in the model summary. Success! 
+Remember that our model object has two items in the formula, los and gender. The residual degrees-of-freedom is the number of observations minus the number of items to account for in the model formula.
+
+This can be seen by passing mod to the function df.residual.
+
+11. Calculate standard error by dividing the deviance by the degrees-of-freedom, and then taking the square root. Verify that this matches the output labeled "Residual standard error" from summary(mod). (5 points)
+
 ```{r}
 df.residual(mod)
 (calcStdErr <- sqrt(deviance(mod)/df.residual(mod)))
@@ -102,8 +143,16 @@ summary(mod)
 predict(mod, se.fit=TRUE)$residual.scale
 ```
  
-11. Finally, I conducted a two-sample t-test comparing the length of stay (los) sample means between men and women. Since the two-sample t-test assumes the two samples are of unequal variance, I began by comparing the variance of the los variable in the men and women groups. Inspired by this variance output, I ran the t.test() with and without the assumption that the variances are equal. The p-value from the t.test with equal variance matched the p-value for the genderM variable in the model summary.
+##T-test##
 
+Let's compare the results of our model to a two-sample t-test. We will compare los by men and women.
+
+12. Create a subset of x by taking all records where gender is 'M' and assigning it to the variable men. Do the same for the variable women. (4 points) 
+
+13. By default a two-sampled t-test assumes that the two groups have unequal variances. You can calculate variance with the var function. Calculate variance for los for the men and women data sets. (3 points)
+
+14. Call the t.test function, where the first argument is los for women and the second argument is los for men. Call it a second time by adding the argument var.equal and setting it to TRUE. Does either produce output that matches the p value for gender from the model summary? (3 points)
+ 
 ```{r}
 men <- subset(x, gender=="M")
 women <- subset(x, gender=="F")
