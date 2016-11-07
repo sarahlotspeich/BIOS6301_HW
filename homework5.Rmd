@@ -1,0 +1,602 @@
+---
+title: 'BIOS6301: Homework 5'
+author: "Sarah Lotspeich"
+date: "11/1/2016"
+output: pdf_document
+---
+##Question 1
+
+24 points
+
+Import the HAART dataset (haart.csv) from the GitHub repository into R, and perform the following manipulations: (4 points each)
+
+```{r, message=FALSE}
+library(lubridate)
+haart <- read.csv("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/haart.csv")
+```
+
+1. Convert date columns into a usable (for analysis) format. Use the table command to display the counts of the year from init.date.
+
+```{r, tidy=TRUE}
+#convert date columns
+haart[,"init.date"] <- as.POSIXct(haart[,"init.date"], format= "%m/%d/%y")
+haart[,"last.visit"] <- as.POSIXct(haart[,"last.visit"], format= "%m/%d/%y")
+haart[,"date.death"] <- as.POSIXct(haart[,"date.death"], format= "%m/%d/%y")
+
+#display counts of the year from init.date
+table(year(haart[,"init.date"]))
+```
+
+1.2. Create an indicator variable (one which takes the values 0 or 1 only) to represent death within 1 year of the initial visit. How many observations died in year 1?
+
+```{r, tidy=TRUE}
+#create indicator variable to represent death within 1 year of the initial visit
+haart$death.within.year <- (difftime(haart$date.death,haart$last.visit,units="days") <= 365)
+haart$death.within.year[is.na(haart$death.within.year)] <- 0
+
+#calculate number of paricipants who died in year 1
+(yr1.deaths <- sum(haart$death.within.year))
+```
+
+1.3. Use the init.date, last.visit and death.date columns to calculate a followup time (in days), which is the difference between the first and either the last visit or a death event (whichever comes first). 
+
+```{r, tidy=TRUE}
+#function that takes who dataframe, adds a followup time column and calculates values, then returns the new and improved dataframe
+calculate.followup <- function(dataframe)
+{
+  for (i in 1:nrow(dataframe))
+  {
+    if (dataframe$death[i] == 1) #check to see if death came first
+    {
+      dataframe$followup.time[i] <- difftime(dataframe$date.death[i],dataframe$init.date[i],units="days")  
+    }
+    else
+    {
+      dataframe$followup.time[i] <- difftime(dataframe$last.visit[i],dataframe$init.date[i],units="days")
+    }
+  }  
+  return(dataframe)
+}
+
+haart <- calculate.followup(haart)
+```
+
+1.4. If these times are longer than 1 year, censor them (this means if the value is above 365, set followup to 365). 
+
+```{r}
+#function that takes in a vector of followup.times and censors them so that 365 is the maximum, then returns the censored vector
+censor.followup <- function(followup.time)
+{
+  for (i in 1:length(followup.time))
+  {
+    if (followup.time[i] > 365)
+    {
+      followup.time[i] <- 365
+    }
+  }
+  return(followup.time)
+}
+
+haart$followup.time <- censor.followup(haart$followup.time)
+```
+
+1.5. Print the quantile for this new variable.
+
+```{r}
+quantile(haart$followup.time)
+```
+
+1.6. Create another indicator variable representing loss to followup; this means the observation is not known to be dead but does not have any followup visits after the first year. How many records are lost-to-followup?
+
+```{r, tidy=TRUE}
+#function that takes in whole dataframe and appens an indicator column for whether or not individuals were lost fo followup
+calculate.losstofollowup <- function(dataframe)
+{
+  for (i in 1:nrow(dataframe))
+  {
+    if (dataframe$death[i] == 1)#if dead, then they weren't "lost-to-followup"
+    {
+      dataframe$loss.to.followup[i] <- 0
+    }
+    else
+    {
+      if (as.integer(difftime(dataframe$last.visit[i],dataframe$init.date[i],units="days")) <= 365) #if not dead, and they haven't had a followup after the first year, then they are "lost-to-followup"
+      {
+        dataframe$loss.to.followup[i] <- 1 
+      }
+      else dataframe$loss.to.followup[i] <- 0 #if not dead, and they have had a followup after the first year, then they werent "lost-to-followup"
+    }
+  }
+  return(dataframe)
+}
+
+#add lost-to-followup column to the haart dataframe
+haart <- calculate.losstofollowup(haart)
+
+sum(haart$loss.to.followup) #sum of indicator variables gives number of patients "lost-to-followup"
+```
+
+So, from this we can see that 173 records were lost-to-followup. 
+
+1.7. Recall our work in class, which separated the init.reg field into a set of indicator variables, one for each unique drug. Create these fields and append them to the database as new columns. 
+
+```{r, tidy=TRUE}
+create.regimens <- function(dataframe)
+{
+  init.reg <- as.character(dataframe[,'init.reg'])
+  dataframe[['init.reg_list']] <- strsplit(init.reg, ",")
+  unique.drugs <- unique(unlist(dataframe$init.reg_list))
+  reg.drugs <- matrix(FALSE, nrow=nrow(dataframe), ncol=length(unique.drugs))
+  for(i in seq_along(unique.drugs)) {
+    reg.drugs[,i] <- sapply(dataframe$init.reg_list, function(x) unique.drugs[i] %in% x)
+  }
+  reg.drugs <- data.frame(reg.drugs)
+  names(reg.drugs) <- unique.drugs
+  dataframe <- cbind(dataframe, reg.drugs)
+  return(dataframe)
+}
+
+haart <- create.regimens(haart)
+```
+
+1.8. Which drug regimen are found over 100 times?
+
+```{r, tidy=TRUE}
+regimen <- matrix(nrow=nrow(haart),ncol=1)
+for (j in 17:34)
+{
+  for (i in 1:nrow(haart))
+  {
+    if (haart[i,j] == TRUE)
+    {
+      if (j == 17)
+      {
+        regimen[i] <- colnames(haart)[j] 
+      }
+      else
+      {
+        regimen[i] <- paste(regimen[i],colnames(haart)[j])
+      }
+    }
+  }    
+}
+haart <- cbind(haart,regimen)
+sort(table(regimen))
+```
+
+From this, we can see that the only regimens that were prescribed more than 100 times were "3TC AZT NVP" and "3TC AZT EFV". 
+
+Turning this into a data frame is as simple as a call to data.frame, using all_drugs as a set of column labels:
+
+1.9. The dataset haart2.csv contains a few additional observations for the same study. Import these and append them to your master dataset (if you were smart about how you coded the previous steps, cleaning the additional observations should be easy!). Show the first five records and the last five records of the complete (and clean) data set.
+
+```{r, tidy=TRUE}
+haart <- data.frame(read.csv("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/haart.csv"))
+haart2 <- data.frame(read.csv("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/haart2.csv"))
+haart.merged <- merge(haart, haart2, all=TRUE)
+
+#convert date columns
+haart.merged[,"init.date"] <- as.POSIXct(haart.merged[,"init.date"], format= "%m/%d/%y")
+haart.merged[,"last.visit"] <- as.POSIXct(haart.merged[,"last.visit"], format= "%m/%d/%y")
+haart.merged[,"date.death"] <- as.POSIXct(haart.merged[,"date.death"], format= "%m/%d/%y")
+
+#create indicator variable to represent death within 1 year of the initial visit
+haart.merged$death.within.year <- (difftime(haart.merged$date.death,haart.merged$last.visit,units="days") <= 365)
+haart.merged$death.within.year[is.na(haart.merged$death.within.year)] <- 0
+
+#create followup time field
+haart.merged <- calculate.followup(haart.merged)
+
+#censor followup time
+haart.merged$followup.time <- censor.followup(haart.merged$followup.time)
+
+#add indicator for loss-to-followup
+haart.merged <- calculate.losstofollowup(haart.merged)
+
+#add indicators for regimen
+haart.merged <- create.regimens(haart.merged)
+
+regimen <- matrix(nrow=nrow(haart.merged),ncol=1)
+for (j in 17:34)
+{
+  for (i in 1:nrow(haart.merged))
+  {
+    if (haart.merged[i,j] == TRUE)
+    {
+      if (j == 17)
+      {
+        regimen[i] <- colnames(haart.merged)[j] 
+      }
+      else
+      {
+        regimen[i] <- paste(regimen[i],colnames(haart.merged)[j])
+      }
+    }
+  }    
+}
+haart.merged <- cbind(haart.merged,regimen)
+
+haart.merged[1:5,] #first 5
+haart.merged[1000:1004,] #last 5
+```
+
+##Question 2
+
+14 points
+
+Use the following code to generate data for patients with repeated measures of A1C (a test for levels of blood glucose).
+
+```{r}
+genData <- function(n) {
+    if(exists(".Random.seed", envir = .GlobalEnv)) {
+        save.seed <- get(".Random.seed", envir= .GlobalEnv)
+        on.exit(assign(".Random.seed", save.seed, envir = .GlobalEnv))
+    } else {
+        on.exit(rm(".Random.seed", envir = .GlobalEnv))
+    }
+    set.seed(n)
+    subj <- ceiling(n / 10)
+    id <- sample(subj, n, replace=TRUE)
+    times <- as.integer(difftime(as.POSIXct("2005-01-01"), as.POSIXct("2000-01-01"), units='secs'))
+    dt <- as.POSIXct(sample(times, n), origin='2000-01-01')
+    mu <- runif(subj, 4, 10)
+    a1c <- unsplit(mapply(rnorm, tabulate(id), mu, SIMPLIFY=FALSE), id)
+    data.frame(id, dt, a1c)
+}
+x <- genData(500)
+```
+
+Perform the following manipulations: (2 points each)
+
+2.1. Order the data set by id and dt.
+```{r}
+x <- x[order(x$id,x$dt),]
+```
+
+2.2. For each id, determine if there is more than a one year gap in between observations. Add a new row at the one year mark, with the a1c value set to missing. A two year gap would require two new rows, and so forth.
+
+```{r}
+#take subset of observations with a parameter for the id
+subset.id <- function(id.num)
+{
+  return(subset(x,x$id==id.num))
+}
+
+#find gaps between observation i and the observation below it that are greater than 365 days (this is where we will need to insert rows)
+find.gaps <- function(id)
+{
+  id.vector <- subset.id(id)
+  gaps <- matrix(nrow=nrow(id.vector),ncol=1)
+  for (i in 1:nrow(id.vector)-1)
+  {
+    gaps[i] <- as.integer(difftime(id.vector[i+1,2],id.vector[i,2],units="days")) #days from visit 1 to visit 2, if >365 insert row below row i
+  }
+  return(gaps)
+}
+
+#apply the find.gaps function to all ids 1:50
+gaps <- NULL
+for (id in 1:50)
+{
+  gaps <- rbind(gaps,find.gaps(id))
+}
+x <- cbind(x,gaps)
+
+#find rows where the gap (after the observation) > 365
+(gaps.positions <- which(abs(x$gaps)>365))
+
+#insert rows for gaps of 1 year
+for (i in 1:length(gaps.positions))
+{
+  row.below <- gaps.positions[i]
+  save.above <- x[1:row.below,] #save all of the rows above
+  save.below <- x[(row.below+1):nrow(x),] #save all of the rows below
+  x[row.below+1,1] <- x[row.below,1]
+  x[row.below+1,2] <- x[row.below,2] + days(365)
+  x[row.below+1,3] <- NA
+  x[row.below+1,4] <- NA
+  x <- rbind(save.above,x[row.below+1,],save.below)
+  gaps.positions <- gaps.positions + 1 #increment gap indeces to account for new inserted row
+}
+
+#apply the function again to allow for two year gaps
+gaps2 <- NULL
+for (id in 1:50)
+{
+  gaps2 <- rbind(gaps2,find.gaps(id))
+}
+x <- cbind(x,gaps2)
+
+(gaps2.positions <- which(abs(x$gaps2)>365)) #find gaps that were greater than 1 year
+
+for (i in 1:length(gaps2.positions))
+{
+  row.below <- gaps2.positions[i]
+  save.above <- x[1:row.below,] #save all of the rows above
+  save.below <- x[(row.below+1):nrow(x),] #save all of the rows below
+  x[row.below+1,1] <- x[row.below,1]
+  x[row.below+1,2] <- x[row.below,2] + days(365)
+  x[row.below+1,3] <- NA
+  x[row.below+1,4] <- NA
+  x <- rbind(save.above,x[row.below+1,],save.below)
+  gaps2.positions <- gaps2.positions + 1 #increment gap indeces to account for new inserted row
+}
+```
+
+2.3. Create a new column visit. For each id, add the visit number. This should be 1 to n where n is the number of observations for an individual. This should include the observations created with missing a1c values.
+
+```{r}
+#function that will create a visit field for the parameterized id
+count.visits <- function(id)
+{
+  id.vector <- subset.id(id)
+  visit.no <- matrix(nrow=nrow(id.vector),ncol=1)
+  for (i in 1:nrow(visit.no))
+  {
+    visit.no[i] <- i
+  }
+  return(visit.no)
+}
+
+#run the count.visits function on all ids to create a complete column for visits
+visit <- NULL
+for (id in 1:50)
+{
+  visit <- rbind(visit,count.visits(id))
+}
+
+#add the visit column to the original x dataframe
+x <- cbind(x,visit)
+```
+
+2.4. For each id, replace missing values with the mean a1c value for that individual.
+
+```{r}
+#function that will find NA in the a1c field and replace them with that id's mean a1c
+replace.na <- function(id)
+{
+  id.vector <- subset.id(id)  
+  a1c.mean <- mean(id.vector$a1c, na.rm=TRUE) #na.rm is important because of the missing values, so if you don't set this to true the means will be 0
+  new.a1c <- matrix(nrow=nrow(id.vector),ncol=1)
+  for (i in 1:nrow(id.vector))
+  {
+    if (is.na(id.vector[i,3])==TRUE)
+    {
+      new.a1c[i] <- a1c.mean 
+    }
+    else
+    {
+      new.a1c[i] <- id.vector[i,3]
+    }
+  }
+  return(new.a1c)
+}
+
+#run the replace.na function for every id from 1:50
+a1c.replaced <- NULL
+for (id in 1:50)
+{
+  a1c.replaced <- rbind(a1c.replaced,replace.na(id))
+}
+
+
+x <- cbind(x,a1c.replaced)
+```
+
+2.5. Print mean a1c for each id.
+
+```{r}
+id.means <- function(id)
+{
+  return(mean(subset.id(id)$a1c.replaced))
+}
+
+id <- seq(1:50)
+
+indiv.means <- lapply(id,id.means)
+
+(avg.a1c.by.id <- cbind(id,indiv.means))
+```
+
+2.6. Print total number of visits for each id.
+
+```{r}
+total.visits <- function(id)
+{
+  return(nrow(subset.id(id)))
+}
+id <- seq(1:50)
+total.visits <- lapply(id,total.visits)
+(total.visits.by.id <- cbind(id,total.visits))
+```
+
+2.7. Print the observations for id = 15.
+
+```{r}
+subset.id(15)
+```
+
+##Question 3
+
+10 points
+
+Import the addr.txt file from the GitHub repository. This file contains a listing of names and addresses (thanks google). Parse each line to create a data.frame with the following columns: lastname, firstname, streetno, streetname, city, state, zip. Keep middle initials or abbreviated names in the firstname column. Print out the entire data.frame.
+
+```{r, tidy=TRUE}
+addr <- read.delim("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/addr.txt", stringsAsFactors = FALSE, head=FALSE)
+
+removeSpaces <- function(text)
+{
+  for (i in 1:nrow(text))
+  {
+    text[i,] <- gsub(" ", "", text[i,], fixed=TRUE) #remove blank spaces
+  }
+  return(text)
+}
+
+#find position of capital letters in the space-less string of characters
+findCaps <- function(textRow)
+{
+  capsPos <- NULL
+  for (i in 1:nchar(textRow))
+  {
+    if (substr(textRow,i,i) %in% LETTERS == TRUE)
+    {
+      capsPos <- c(capsPos, i)
+    }
+  }
+  return(capsPos)
+}
+
+findPeriods <- function(textRow)
+{
+  periodPos <- NULL
+  for (i in 1:nchar(textRow))
+  {
+    if ((substr(textRow,i,i) == ".") == TRUE)
+    {
+      periodPos <- c(periodPos, i)
+    }
+  }
+  return(periodPos)
+}
+
+findNumbers <- function(textRow)
+{
+  numberPos <- NULL
+  for (i in 1:nchar(textRow))
+  {
+    if ((substr(textRow,i,i) %in% seq(0,9)) == TRUE)
+    {
+      numberPos <- c(numberPos, i)
+    }
+  }
+  return(numberPos)
+}
+
+get.firstname <- function(textRow)
+{
+    if (length(row.period.positions)>0)
+    {
+      if (row.period.positions[1] - row.cap.positions[3] == 1)
+      {
+        firstname[i] <- substr(text[i,],row.cap.positions[2],row.period.positions[1]) #include middle initial in firstname
+      }
+      else
+      {
+        firstname[i] <- substr(text[i,],row.cap.positions[2],(row.number.positions[1]-1))
+      }
+    }
+    else
+    {
+      firstname[i] <- substr(text[i,],row.cap.positions[2],(row.number.positions[1]-1))
+    }
+}
+
+find.first.jump <- function(rowNums)
+{
+  jump <- vector()
+  max.jump <- 0
+  for (i in 1:length(rowNums))
+  {
+      jump[i] <- rowNums[i+1]-rowNums[i]
+  }
+  first.jump <- min(rowNums[which(jump>1)])
+  return(first.jump) #return position of last number in streetno
+}
+
+replace.O <- function(textRow)
+{
+  if (substr(addr[41,],(nchar(addr[41,])-4),(nchar(addr[41,])-4)) == "-")
+  {
+    substr(textRow,(nchar(textRow)-9),nchar(textRow)) <- sub("O", "0",substr(textRow,(nchar(textRow)-9),nchar(textRow)))   
+  }
+  else
+  {
+    substr(textRow,(nchar(textRow)-4),nchar(textRow)) <- sub("O", "0",substr(textRow,(nchar(textRow)-4),nchar(textRow)))  
+  }
+  return(textRow)
+}
+
+lastname <- vector()
+firstname <- vector()
+streetno <- vector()
+streetname <- vector()
+city <- vector()
+state <- vector()
+zip <- vector()
+
+fixText <- function(text)
+{
+  text <- removeSpaces(text)
+  for (i in 1:nrow(text))
+  {
+    text[i,] <- replace.O(text[i,]) #replace incorrect Os in zipcodes with 0s 
+    row.cap.positions <- findCaps(text[i,])
+    row.period.positions <- findPeriods(text[i,])
+    row.number.positions <- findNumbers(text[i,])
+    lastname[i] <- substr(text[i,],1,(row.cap.positions[2]-1))
+    firstname[i] <- substr(text[i,],row.cap.positions[2],(row.number.positions[1]-1))
+    streetno[i] <- substr(text[i,],row.number.positions[1],find.first.jump(row.number.positions))
+    state[i] <- substr(text[i,],(row.cap.positions[length(row.cap.positions)-1]),row.cap.positions[length(row.cap.positions)])
+    zip[i] <- substr(text[i,],(row.cap.positions[length(row.cap.positions)]+1),nchar(text[i,]))
+    streetname[i] <- substr(text[i,],(find.first.jump(row.number.positions)+1),(row.cap.positions[length(row.cap.positions)-2]-1))
+    city[i] <- substr(text[i,],(row.cap.positions[length(row.cap.positions)-2]),(row.cap.positions[length(row.cap.positions)-1]-1))  
+  }
+  return(cbind(lastname,firstname,streetno,streetname,city,state,zip))
+}
+
+addr <- data.frame(fixText(addr))
+```
+
+Question 4
+
+2 points
+
+The first argument to most functions that fit linear models are formulas. The following example defines the response variable death and allows the model to incorporate all other variables as terms. . is used to mean all columns not otherwise in the formula.
+
+```{r}
+url <- "https://github.com/fonnesbeck/Bios6301/raw/master/datasets/haart.csv"
+haart_df <- read.csv(url)[,c('death','weight','hemoglobin','cd4baseline')]
+coef(summary(glm(death ~ ., data=haart_df, family=binomial(logit))))
+```
+
+Now imagine running the above several times, but with a different response and data set each time. Here's a function:
+
+```{r}
+myfun <- function(dat, response) {
+  form <- as.formula(response ~ .)
+  coef(summary(glm(form, data=dat, family=binomial(logit))))
+}
+```
+
+Unfortunately, it doesn't work. tryCatch is "catching" the error so that this file can be knit to PDF.
+
+```{r}
+tryCatch(myfun(haart_df, death), error = function(e) e)
+```
+
+What do you think is going on? Consider using debug to trace the problem.
+
+The tryCatch error message reads: <simpleError in eval(expr, envir, enclos): object 'death' not found>, so I wondered if the problem could be in the way that the "response" variable was included in the parameters. To test my theory, I ran the line again with a minor correction:
+
+```{r}
+tryCatch(myfun(haart_df, haart_df$death), error = function(e) e)
+```
+
+Hooray! Now the function runs completely. Although, the algorithm does not converge, but that is more an artifact of the data than the code written above. 
+
+##Bonus
+
+5 bonus points
+
+Create a working function.
+
+```{r}
+calculate.tax <- function(price)
+{
+  return(price*1.0925) #returns the price after accounting for Nashville's absurd 9.25% sales tax
+}
+starbucks <- 4 #the price of my morning vanilla sweet cream cold brew (before tax)
+calculate.tax(starbucks) #price of my morning vanilla sweet cream cold brew (after tax)
+```
