@@ -13,6 +13,7 @@ Import the HAART dataset (haart.csv) from the GitHub repository into R, and perf
 ```{r, message=FALSE}
 library(lubridate)
 haart <- read.csv("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/haart.csv")
+head(haart) #preview structure of base dataset
 ```
 
 1. Convert date columns into a usable (for analysis) format. Use the table command to display the counts of the year from init.date.
@@ -33,6 +34,7 @@ table(year(haart[,"init.date"]))
 #create indicator variable to represent death within 1 year of the initial visit
 haart$death.within.year <- (difftime(haart$date.death,haart$last.visit,units="days") <= 365)
 haart$death.within.year[is.na(haart$death.within.year)] <- 0
+head(haart) #prove I added the column correctly
 
 #calculate number of paricipants who died in year 1
 (yr1.deaths <- sum(haart$death.within.year))
@@ -59,12 +61,15 @@ calculate.followup <- function(dataframe)
 }
 
 haart <- calculate.followup(haart)
+head(haart)
 ```
 
 1.4. If these times are longer than 1 year, censor them (this means if the value is above 365, set followup to 365). 
 
 ```{r}
-#function that takes in a vector of followup.times and censors them so that 365 is the maximum, then returns the censored vector
+#function that takes in a vector of followup.times and 
+#censors them so that 365 is the maximum, then returns the censored vector
+max(haart$followup.time) #see the max of followup.time as calculated
 censor.followup <- function(followup.time)
 {
   for (i in 1:length(followup.time))
@@ -76,8 +81,8 @@ censor.followup <- function(followup.time)
   }
   return(followup.time)
 }
-
 haart$followup.time <- censor.followup(haart$followup.time)
+max(haart$followup.time) #see the new max of followup.time after censoring to make sure it worked
 ```
 
 1.5. Print the quantile for this new variable.
@@ -89,7 +94,8 @@ quantile(haart$followup.time)
 1.6. Create another indicator variable representing loss to followup; this means the observation is not known to be dead but does not have any followup visits after the first year. How many records are lost-to-followup?
 
 ```{r, tidy=TRUE}
-#function that takes in whole dataframe and appens an indicator column for whether or not individuals were lost fo followup
+#function that takes in whole dataframe and appends an indicator 
+#column for whether or not individuals were lost fo followup
 calculate.losstofollowup <- function(dataframe)
 {
   for (i in 1:nrow(dataframe))
@@ -100,11 +106,13 @@ calculate.losstofollowup <- function(dataframe)
     }
     else
     {
-      if (as.integer(difftime(dataframe$last.visit[i],dataframe$init.date[i],units="days")) <= 365) #if not dead, and they haven't had a followup after the first year, then they are "lost-to-followup"
+      #if not dead, and they haven't had a followup after the first year, then they are "lost-to-followup"
+      if (as.integer(difftime(dataframe$last.visit[i],dataframe$init.date[i],units="days")) <= 365) 
       {
         dataframe$loss.to.followup[i] <- 1 
       }
-      else dataframe$loss.to.followup[i] <- 0 #if not dead, and they have had a followup after the first year, then they werent "lost-to-followup"
+      #if not dead, and they have had a followup after the first year, then they werent "lost-to-followup"
+      else dataframe$loss.to.followup[i] <- 0 
     }
   }
   return(dataframe)
@@ -112,11 +120,13 @@ calculate.losstofollowup <- function(dataframe)
 
 #add lost-to-followup column to the haart dataframe
 haart <- calculate.losstofollowup(haart)
+head(haart) #appreciate shiny new column
 
-sum(haart$loss.to.followup) #sum of indicator variables gives number of patients "lost-to-followup"
+#sum of indicator variables gives number of patients "lost-to-followup"
+sum(haart$loss.to.followup) 
 ```
 
-So, from this we can see that 173 records were lost-to-followup. 
+So, from this we can see that `r sum(haart$loss.to.followup)` records were lost-to-followup. 
 
 1.7. Recall our work in class, which separated the init.reg field into a set of indicator variables, one for each unique drug. Create these fields and append them to the database as new columns. 
 
@@ -137,6 +147,7 @@ create.regimens <- function(dataframe)
 }
 
 haart <- create.regimens(haart)
+head(haart) #why not
 ```
 
 1.8. Which drug regimen are found over 100 times?
@@ -161,6 +172,8 @@ for (j in 17:34)
   }    
 }
 haart <- cbind(haart,regimen)
+haart[,17:34] <- NULL #get rid of the indicators before preview
+head(haart) #check what that actually did
 sort(table(regimen))
 ```
 
@@ -262,14 +275,15 @@ subset.id <- function(id.num)
   return(subset(x,x$id==id.num))
 }
 
-#find gaps between observation i and the observation below it that are greater than 365 days (this is where we will need to insert rows)
+#find gaps between observation i and the observation below it that are greater than 365 days 
+#this is where we will need to insert rows
 find.gaps <- function(id)
 {
   id.vector <- subset.id(id)
   gaps <- matrix(nrow=nrow(id.vector),ncol=1)
   for (i in 1:nrow(id.vector)-1)
   {
-    gaps[i] <- as.integer(difftime(id.vector[i+1,2],id.vector[i,2],units="days")) #days from visit 1 to visit 2, if >365 insert row below row i
+    gaps[i] <- as.integer(difftime(id.vector[i+1,2],id.vector[i,2],units="days"))
   }
   return(gaps)
 }
@@ -356,7 +370,7 @@ x <- cbind(x,visit)
 replace.na <- function(id)
 {
   id.vector <- subset.id(id)  
-  a1c.mean <- mean(id.vector$a1c, na.rm=TRUE) #na.rm is important because of the missing values, so if you don't set this to true the means will be 0
+  a1c.mean <- mean(id.vector$a1c, na.rm=TRUE)
   new.a1c <- matrix(nrow=nrow(id.vector),ncol=1)
   for (i in 1:nrow(id.vector))
   {
@@ -425,41 +439,14 @@ Import the addr.txt file from the GitHub repository. This file contains a listin
 ```{r, tidy=TRUE}
 addr <- read.delim("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/addr.txt", stringsAsFactors = FALSE, head=FALSE)
 
-removeSpaces <- function(text)
+find.spaces <- function(textRow)
 {
-  for (i in 1:nrow(text))
-  {
-    text[i,] <- gsub(" ", "", text[i,], fixed=TRUE) #remove blank spaces
-  }
-  return(text)
+  spaces <- c(unlist(gregexpr(" {2,}",textRow)),nchar(textRow))  
+  return(spaces) #return a vector of values where spaces of length 2+ are located in the textRow
 }
 
-#find position of capital letters in the space-less string of characters
-findCaps <- function(textRow)
-{
-  capsPos <- NULL
-  for (i in 1:nchar(textRow))
-  {
-    if (substr(textRow,i,i) %in% LETTERS == TRUE)
-    {
-      capsPos <- c(capsPos, i)
-    }
-  }
-  return(capsPos)
-}
-
-findPeriods <- function(textRow)
-{
-  periodPos <- NULL
-  for (i in 1:nchar(textRow))
-  {
-    if ((substr(textRow,i,i) == ".") == TRUE)
-    {
-      periodPos <- c(periodPos, i)
-    }
-  }
-  return(periodPos)
-}
+trim <- function (x) gsub("^\\s+|\\s+$", "", x) 
+#credit: http://stackoverflow.com/questions/2261079/how-to-trim-leading-and-trailing-whitespace-in-r
 
 findNumbers <- function(textRow)
 {
@@ -474,50 +461,6 @@ findNumbers <- function(textRow)
   return(numberPos)
 }
 
-get.firstname <- function(textRow)
-{
-    if (length(row.period.positions)>0)
-    {
-      if (row.period.positions[1] - row.cap.positions[3] == 1)
-      {
-        firstname[i] <- substr(text[i,],row.cap.positions[2],row.period.positions[1]) #include middle initial in firstname
-      }
-      else
-      {
-        firstname[i] <- substr(text[i,],row.cap.positions[2],(row.number.positions[1]-1))
-      }
-    }
-    else
-    {
-      firstname[i] <- substr(text[i,],row.cap.positions[2],(row.number.positions[1]-1))
-    }
-}
-
-find.first.jump <- function(rowNums)
-{
-  jump <- vector()
-  max.jump <- 0
-  for (i in 1:length(rowNums))
-  {
-      jump[i] <- rowNums[i+1]-rowNums[i]
-  }
-  first.jump <- min(rowNums[which(jump>1)])
-  return(first.jump) #return position of last number in streetno
-}
-
-replace.O <- function(textRow)
-{
-  if (substr(addr[41,],(nchar(addr[41,])-4),(nchar(addr[41,])-4)) == "-")
-  {
-    substr(textRow,(nchar(textRow)-9),nchar(textRow)) <- sub("O", "0",substr(textRow,(nchar(textRow)-9),nchar(textRow)))   
-  }
-  else
-  {
-    substr(textRow,(nchar(textRow)-4),nchar(textRow)) <- sub("O", "0",substr(textRow,(nchar(textRow)-4),nchar(textRow)))  
-  }
-  return(textRow)
-}
-
 lastname <- vector()
 firstname <- vector()
 streetno <- vector()
@@ -528,25 +471,37 @@ zip <- vector()
 
 fixText <- function(text)
 {
-  text <- removeSpaces(text)
   for (i in 1:nrow(text))
   {
-    text[i,] <- replace.O(text[i,]) #replace incorrect Os in zipcodes with 0s 
-    row.cap.positions <- findCaps(text[i,])
-    row.period.positions <- findPeriods(text[i,])
-    row.number.positions <- findNumbers(text[i,])
-    lastname[i] <- substr(text[i,],1,(row.cap.positions[2]-1))
-    firstname[i] <- substr(text[i,],row.cap.positions[2],(row.number.positions[1]-1))
-    streetno[i] <- substr(text[i,],row.number.positions[1],find.first.jump(row.number.positions))
-    state[i] <- substr(text[i,],(row.cap.positions[length(row.cap.positions)-1]),row.cap.positions[length(row.cap.positions)])
-    zip[i] <- substr(text[i,],(row.cap.positions[length(row.cap.positions)]+1),nchar(text[i,]))
-    streetname[i] <- substr(text[i,],(find.first.jump(row.number.positions)+1),(row.cap.positions[length(row.cap.positions)-2]-1))
-    city[i] <- substr(text[i,],(row.cap.positions[length(row.cap.positions)-2]),(row.cap.positions[length(row.cap.positions)-1]-1))  
+    row.spaces <- find.spaces(text[i,])
+    lastname[i] <- substr(text[i,],1,(row.spaces[1]-1))
+    firstname[i] <- trim(substr(text[i,],(row.spaces[1]+1),(row.spaces[2]-1)))
+    streetno.pos <- findNumbers(substr(text[i,],(row.spaces[2]+1),(row.spaces[3]-1))) #find indices of the numbers in the street address
+    #some addresses contain numerical street names, so streetno.pos can be longer than just the first 3-4 streetno values
+    if (length(streetno.pos)>4) 
+    {
+      streetno[i] <- substr(substr(text[i,],(row.spaces[2]+1),(row.spaces[3]-1)),
+                            min(streetno.pos),(min(streetno.pos)+3))
+      streetname[i] <- trim(substr(substr(text[i,],(row.spaces[2]+1),(row.spaces[3]-1)),
+                                   (min(streetno.pos)+4),row.spaces[3]-1))
+    }
+    else
+    {
+      streetno[i] <- substr(substr(text[i,],(row.spaces[2]+1),(row.spaces[3]-1)),
+                            min(streetno.pos),max(streetno.pos))
+      streetname[i] <- trim(substr(substr(text[i,],(row.spaces[2]+1),(row.spaces[3]-1)),
+                                   (max(streetno.pos)+1),row.spaces[3]-1))      
+    }
+
+    city[i] <- trim(substr(text[i,],row.spaces[3],row.spaces[4]))
+    state[i] <- trim(substr(text[i,],row.spaces[4],row.spaces[5]))
+    zip[i] <- trim(substr(text[i,],row.spaces[5],row.spaces[6]))
   }
+  zip <- sub("O","0",zip) #replace mistaken Os in zipcodes with 0s
   return(cbind(lastname,firstname,streetno,streetname,city,state,zip))
 }
 
-addr <- data.frame(fixText(addr))
+(addr <- data.frame(fixText(addr)))
 ```
 
 Question 4
@@ -593,10 +548,13 @@ Hooray! Now the function runs completely. Although, the algorithm does not conve
 Create a working function.
 
 ```{r}
-calculate.tax <- function(price)
-{
-  return(price*1.0925) #returns the price after accounting for Nashville's absurd 9.25% sales tax
+myfun <- function(dat, response) {
+  attach(dat, warn.conflicts = FALSE) 
+  #by attaching the dataframe names we can call response without an identifier
+  form <- as.formula(response ~ .)
+  print(coef(summary(glm(form, data=dat, family=binomial(logit)))))
+  detach(dat)
 }
-starbucks <- 4 #the price of my morning vanilla sweet cream cold brew (before tax)
-calculate.tax(starbucks) #price of my morning vanilla sweet cream cold brew (after tax)
+
+tryCatch(myfun(haart_df, death), error = function(e) e)
 ```
