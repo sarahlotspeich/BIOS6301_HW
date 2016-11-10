@@ -10,7 +10,7 @@ output: pdf_document
 
 Import the HAART dataset (haart.csv) from the GitHub repository into R, and perform the following manipulations: (4 points each)
 
-```{r, message=FALSE}
+```{r, message=FALSE, tidy.opts=list(width.cutoff=60)}
 library(lubridate)
 haart <- read.csv("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/haart.csv")
 head(haart) #preview structure of base dataset
@@ -18,7 +18,7 @@ head(haart) #preview structure of base dataset
 
 1. Convert date columns into a usable (for analysis) format. Use the table command to display the counts of the year from init.date.
 
-```{r, tidy=TRUE}
+```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 #convert date columns
 haart[,"init.date"] <- as.POSIXct(haart[,"init.date"], format= "%m/%d/%y")
 haart[,"last.visit"] <- as.POSIXct(haart[,"last.visit"], format= "%m/%d/%y")
@@ -30,7 +30,7 @@ table(year(haart[,"init.date"]))
 
 1.2. Create an indicator variable (one which takes the values 0 or 1 only) to represent death within 1 year of the initial visit. How many observations died in year 1?
 
-```{r, tidy=TRUE}
+```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 #create indicator variable to represent death within 1 year of the initial visit
 haart$death.within.year <- (difftime(haart$date.death,haart$last.visit,units="days") <= 365)
 haart$death.within.year[is.na(haart$death.within.year)] <- 0
@@ -42,19 +42,22 @@ head(haart) #prove I added the column correctly
 
 1.3. Use the init.date, last.visit and death.date columns to calculate a followup time (in days), which is the difference between the first and either the last visit or a death event (whichever comes first). 
 
-```{r, tidy=TRUE}
-#function that takes who dataframe, adds a followup time column and calculates values, then returns the new and improved dataframe
+```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+#function that takes who dataframe, adds a followup time column and calculates values 
+#then returns the new and improved dataframe
 calculate.followup <- function(dataframe)
 {
   for (i in 1:nrow(dataframe))
   {
     if (dataframe$death[i] == 1) #check to see if death came first
     {
-      dataframe$followup.time[i] <- difftime(dataframe$date.death[i],dataframe$init.date[i],units="days")  
+      dataframe$followup.time[i] <- difftime(dataframe$date.death[i],dataframe$init.date[i],
+                                             units="days")  
     }
     else
     {
-      dataframe$followup.time[i] <- difftime(dataframe$last.visit[i],dataframe$init.date[i],units="days")
+      dataframe$followup.time[i] <- difftime(dataframe$last.visit[i],dataframe$init.date[i],
+                                             units="days")
     }
   }  
   return(dataframe)
@@ -82,7 +85,7 @@ censor.followup <- function(followup.time)
   return(followup.time)
 }
 haart$followup.time <- censor.followup(haart$followup.time)
-max(haart$followup.time) #see the new max of followup.time after censoring to make sure it worked
+max(haart$followup.time) #see new max of followup.time after censoring
 ```
 
 1.5. Print the quantile for this new variable.
@@ -106,12 +109,12 @@ calculate.losstofollowup <- function(dataframe)
     }
     else
     {
-      #if not dead, and they haven't had a followup after the first year, then they are "lost-to-followup"
+      #if not dead, haven't had followup after first year, "lost-to-followup"
       if (as.integer(difftime(dataframe$last.visit[i],dataframe$init.date[i],units="days")) <= 365) 
       {
         dataframe$loss.to.followup[i] <- 1 
       }
-      #if not dead, and they have had a followup after the first year, then they werent "lost-to-followup"
+      #if not dead, have had a followup after first year, not "lost-to-followup"
       else dataframe$loss.to.followup[i] <- 0 
     }
   }
