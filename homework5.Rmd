@@ -1,7 +1,7 @@
 ---
 title: 'BIOS6301: Homework 5'
 author: "Sarah Lotspeich"
-date: "11/1/2016"
+date: "15 November 2016"
 output: pdf_document
 ---
 ##Question 1
@@ -10,7 +10,7 @@ output: pdf_document
 
 Import the HAART dataset (haart.csv) from the GitHub repository into R, and perform the following manipulations: (4 points each)
 
-```{r, message=FALSE, tidy.opts=list(width.cutoff=60)}
+```{r, message=FALSE}
 library(lubridate)
 haart <- read.csv("https://raw.githubusercontent.com/fonnesbeck/Bios6301/master/datasets/haart.csv")
 head(haart) #preview structure of base dataset
@@ -18,7 +18,7 @@ head(haart) #preview structure of base dataset
 
 1. Convert date columns into a usable (for analysis) format. Use the table command to display the counts of the year from init.date.
 
-```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r, tidy=TRUE}
 #convert date columns
 haart[,"init.date"] <- as.POSIXct(haart[,"init.date"], format= "%m/%d/%y")
 haart[,"last.visit"] <- as.POSIXct(haart[,"last.visit"], format= "%m/%d/%y")
@@ -30,7 +30,7 @@ table(year(haart[,"init.date"]))
 
 1.2. Create an indicator variable (one which takes the values 0 or 1 only) to represent death within 1 year of the initial visit. How many observations died in year 1?
 
-```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r, tidy=TRUE}
 #create indicator variable to represent death within 1 year of the initial visit
 haart$death.within.year <- (difftime(haart$date.death,haart$last.visit,units="days") <= 365)
 haart$death.within.year[is.na(haart$death.within.year)] <- 0
@@ -42,7 +42,7 @@ head(haart) #prove I added the column correctly
 
 1.3. Use the init.date, last.visit and death.date columns to calculate a followup time (in days), which is the difference between the first and either the last visit or a death event (whichever comes first). 
 
-```{r, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r, tidy=TRUE}
 #function that takes who dataframe, adds a followup time column and calculates values 
 #then returns the new and improved dataframe
 calculate.followup <- function(dataframe)
@@ -553,9 +553,13 @@ Create a working function.
 ```{r}
 myfun <- function(dat, response) {
   attach(dat, warn.conflicts = FALSE) 
+  response.name <- deparse(substitute(response))
+  df.name <- deparse(substitute(dat))
+  reponse.df <- paste(df.name,response.name, sep="$")
+  formula <- paste(reponse.df," ~ .", sep="")
   #by attaching the dataframe names we can call response without an identifier
-  form <- as.formula(response ~ .)
-  print(coef(summary(glm(form, data=dat, family=binomial(logit)))))
+  #form <- as.formula(response ~ .)
+  print(coef(summary(glm(formula, data=dat, family=binomial(logit)))))
   detach(dat)
 }
 
