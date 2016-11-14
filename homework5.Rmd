@@ -536,13 +536,7 @@ tryCatch(myfun(haart_df, death), error = function(e) e)
 
 What do you think is going on? Consider using debug to trace the problem.
 
-The tryCatch error message reads: <simpleError in eval(expr, envir, enclos): object 'death' not found>, so I wondered if the problem could be in the way that the "response" variable was included in the parameters. To test my theory, I ran the line again with a minor correction:
-
-```{r}
-tryCatch(myfun(haart_df, haart_df$death), error = function(e) e)
-```
-
-Hooray! Now the function runs completely. Although, the algorithm does not converge, but that is more an artifact of the data than the code written above. 
+The tryCatch error message reads: <simpleError in eval(expr, envir, enclos): object 'death' not found>, so I wondered if the problem could be in the way that the "response" variable was included in the parameters. The function as it is currently written is expecting "death" to be a defined vector, but actually it is a specific column of the dataframe parameter, dat. I attempted to fix the issue by running myfun() with haart_df and haart_df$response instead, but then the response variable was being doubly included as the response and in the predictors. Therefore, to fix this function in moving forward I manipulated text functions such as paste() and deparse() to pull apart the words put into the myfun() paramter and build the appropriate formula. 
 
 ##Bonus
 
@@ -552,15 +546,11 @@ Create a working function.
 
 ```{r}
 myfun <- function(dat, response) {
-  attach(dat, warn.conflicts = FALSE) 
   response.name <- deparse(substitute(response))
   df.name <- deparse(substitute(dat))
   reponse.df <- paste(df.name,response.name, sep="$")
   formula <- paste(reponse.df," ~ .", sep="")
-  #by attaching the dataframe names we can call response without an identifier
-  #form <- as.formula(response ~ .)
   print(coef(summary(glm(formula, data=dat, family=binomial(logit)))))
-  detach(dat)
 }
 
 tryCatch(myfun(haart_df, death), error = function(e) e)
